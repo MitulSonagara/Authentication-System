@@ -4,7 +4,10 @@ const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
-const md5 = require('md5');
+// const md5 = require('md5');
+const bcrypt = require('bcrypt');
+
+const saltRound = 10
 
 const app = express();
 
@@ -44,33 +47,36 @@ app.get('/register', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    await User.create({
-        email: req.body.username,
-        password: md5(req.body.password)
+
+    await bcrypt.hash(req.body.password, saltRound, async (err, hash) => {
+        await User.create({
+            email: req.body.username,
+            password: hash
+        })
+
+        try {
+            res.render("secrets")
+        } catch (err) {
+            console.error(err);
+            res.render("register", { errorMessage: "Registration failed. Please try again." });
+        }
+
     })
-
-    try {
-        res.render("secrets")
-    } catch (err) {
-        console.error(err);
-        res.render("register", { errorMessage: "Registration failed. Please try again." });
-    }
-
-
 });
 
 app.post('/login', async (req, res) => {
     const username = req.body.username
-    const entered_password = md5(req.body.password)
+    const entered_password = req.body.password
 
     try {
         const userfound = await User.findOne({ email: username })
-        console.log(userfound)
-        if (userfound.password === entered_password) {
-            res.render("secrets")
-        } else {
-            res.render("login")
-        }
+        bcrypt.compare(entered_password, userfound.password, (err, result) => {
+            if (result = true) {
+                res.render("secrets")
+            } else {
+                res.render("login")
+            }
+        })
     } catch (err) {
         console.error(err);
         res.render("login", { errorMessage: "Invalid email or password. Please try again." })
